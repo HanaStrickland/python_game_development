@@ -10,7 +10,6 @@ from pyglet.image import load as iload, ImageGrid, Animation
 from pyglet.media import load as mload
 from random import random
 
-# 1:52:32
 
 def load_animation(image):
     seq = ImageGrid(iload(image),2,1)
@@ -64,6 +63,7 @@ class Alien(Actor):
 # a column creates and contains its Aliens
 class AlienColumn:
     def __init__(self, x, y):
+        self.rate_of_fire = 0.0005
         # enumerate() provides an index number for each list item
         alien_types = enumerate(["3", "3", "2", "2", "1"])
 
@@ -71,6 +71,18 @@ class AlienColumn:
             Alien(x, y + i * 60, alien_type, self)
             for i, alien_type in alien_types
         ]
+
+    def increase_difficulty(self):
+        self.rate_of_fire *= 2
+
+
+    def shoot(self):
+        if random() < self.rate_of_fire and len(self.aliens) > 0:
+            # get position of bottom-most alien
+            x,y = self.aliens[0].position
+            return AlienShoot(x, y - 50)
+        else:
+            return None
 
     # method to tell a column to remove an alien from itself
     def remove(self, alien):
@@ -107,12 +119,15 @@ class Swarm:
         # swarm initially moves to the right (direction 1)
         self.direction = 1
         # only has horizontal speed
-        self.speed = Vector2(10, 0)
+        self.speed = Vector2(10, 0) # how big the step is
 
         # swarm moves once per second, so accumulate the
         # delta_times until it reaches 1
         self.elapsed = 0.0
-        self.period = 1.0
+        self.period = 1.0 # how often the step is made
+
+    def increase_difficulty(self):
+        self.period -= 0.1 # question for HW - Where do you call this function?
 
     # return True/False whether any column is too close to edge of screen
     def side_reached(self):
@@ -173,6 +188,41 @@ class PlayerCannon(Actor):
         if left_edge > self.x or right_edge < self.x: # fixes bug that makes cannon stick to either side of the screen
             self.move(self.speed * horizontal_movement * delta_time * -1)
 
+        is_firing = keyboard[key.SPACE]
+        if PlayerShoot.ACTIVE_SHOOT is None and is_firing:
+            self.parent.add(PlayerShoot(self.x,self.y + 50))
+            shoot_sfx.play() # plays sound effect
+
+class PlayerShoot(Actor):
+    ACTIVE_SHOOT = None
+
+    def __init__(self, x, y):
+        super().__init__("img/laser.png", x, y)
+
+        self.speed = Vector2(0, 400)
+        PlayerShoot.ACTIVE_SHOOT = self
+
+    def collide(self,other):
+        if isinstance(other,Alien):
+            self.parent.update_score(other.points)
+            other.kill()
+            self.kill()
+
+    def on_exit(self):
+        super().on_exit()
+        PlayerShoot.ACTIVE_SHOOT = None
+
+    def update(self, delta_time):
+        self.move(self.speed * delta_time)
+
+class AlienShoot(Actor):
+    def __init__(self, x, y):
+        super().__init__("img/shoot.png", x, y)
+        self.speed = Vector2(0, -400)
+
+    def update(self, delta_time):
+        self.move(self.speed * delta_time)
+
 class HUD(Layer):
     def __init__(self):
         super().__init__()
@@ -222,6 +272,21 @@ class GameLayer(Layer):
 
         self.schedule(self.game_loop)
 
+    def respawn_player(self):
+        self.lives -= 1
+        if self.lives <0:
+            self.unschedule(self.game_loop)
+            self.hud.show_game_over("Game Over")
+        else:
+            self.create_player()
+
+    def collide(self, actor):
+        if actor is not None:
+            for other in self.collman.iter_colliding(actor):
+                actor.collide(other)
+                return True
+        return False
+
 
     def create_player(self):
         self.player = PlayerCannon(self.width * 0.5, 50)
@@ -233,6 +298,25 @@ class GameLayer(Layer):
         self.hud.update_score(self.score)
 
     def game_loop(self,delta_time):
+        self.collman.clear()
+        for _,actor in self.children:
+            self.collman.add(actor)
+            if not self.collman.knows(actor):
+                self.remove(actor)
+
+        if self.collide(PlayerShoot.ACTIVE_SHOOT): # if we hit something
+            kill_sfx.play()
+
+
+        if self.collide(self.player):
+            self.respawn_player()
+            die_sfx.play()
+
+        for column in self.swarm.columns:
+            shoot = column.shoot()
+            if shoot is not None:
+                self.add(shoot)
+
         for _,actor in self.children:
             actor.update(delta_time)
         self.swarm.update(delta_time)
@@ -243,6 +327,15 @@ class GameLayer(Layer):
             self.add(alien)
 
 if __name__ == "__main__":
+    # song = mload("sfx/level1.ogg")
+    # player = song.play()
+    # player.loop = True
+
+    shoot_sfx = mload("sfx/shoot.wav",streaming=False)
+    kill_sfx = mload("sfx/invaderkilled.wav",streaming=False)
+    die_sfx = mload("sfx/explosion.wav",streaming=False)
+
+
     director.init(caption="Space Invaders", width=800, height=650)
 
     keyboard = key.KeyStateHandler()
