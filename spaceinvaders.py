@@ -10,6 +10,8 @@ from pyglet.image import load as iload, ImageGrid, Animation
 from pyglet.media import load as mload
 from random import random
 
+# reset rate of fire for aleins
+# reset laser rate to 400
 
 def load_animation(image):
     seq = ImageGrid(iload(image),2,1)
@@ -59,11 +61,10 @@ class Alien(Actor):
         if self.column:
             self.column.remove(self)
 
-
 # a column creates and contains its Aliens
 class AlienColumn:
     def __init__(self, x, y):
-        self.rate_of_fire = 0.0005
+        self.rate_of_fire = 0.0000
         # enumerate() provides an index number for each list item
         alien_types = enumerate(["3", "3", "2", "2", "1"])
 
@@ -126,6 +127,8 @@ class Swarm:
         self.elapsed = 0.0
         self.period = 1.0 # how often the step is made
 
+        self.aliens_left = 50
+
     def increase_difficulty(self):
         self.period -= 0.1 # question for HW - Where do you call this function?
 
@@ -166,6 +169,13 @@ class Swarm:
             for alien in self:
                 alien.move(movement)
 
+        # Every frame, the number of aliens in the game are counted and put in self.aliens_left
+        count = 0
+        for alien in self:
+            count += 1
+        self.aliens_left = count
+
+
 class PlayerCannon(Actor):
     def __init__(self, x, y):
         super().__init__("img/cannon.png", x ,y)
@@ -199,7 +209,7 @@ class PlayerShoot(Actor):
     def __init__(self, x, y):
         super().__init__("img/laser.png", x, y)
 
-        self.speed = Vector2(0, 400)
+        self.speed = Vector2(0, 2000)
         PlayerShoot.ACTIVE_SHOOT = self
 
     def collide(self,other):
@@ -272,6 +282,11 @@ class GameLayer(Layer):
 
         self.schedule(self.game_loop)
 
+    def winning(self): # winning condition: if no aliens left in Swarm, then stop the game and say "You Win!)
+        if self.swarm.aliens_left == 0:
+            self.unschedule(self.game_loop)
+            self.hud.show_game_over("You Win!")
+
     def respawn_player(self):
         self.lives -= 1
         if self.lives <0:
@@ -297,7 +312,16 @@ class GameLayer(Layer):
         self.score += points
         self.hud.update_score(self.score)
 
+
+    def create_swarm(self, x, y):
+        self.swarm = Swarm(x, y)
+        for alien in self.swarm:
+            self.add(alien)
+
     def game_loop(self,delta_time):
+
+        self.winning() # call winning
+
         self.collman.clear()
         for _,actor in self.children:
             self.collman.add(actor)
@@ -306,7 +330,6 @@ class GameLayer(Layer):
 
         if self.collide(PlayerShoot.ACTIVE_SHOOT): # if we hit something
             kill_sfx.play()
-
 
         if self.collide(self.player):
             self.respawn_player()
@@ -319,12 +342,11 @@ class GameLayer(Layer):
 
         for _,actor in self.children:
             actor.update(delta_time)
-        self.swarm.update(delta_time)
 
-    def create_swarm(self, x, y):
-        self.swarm = Swarm(x, y)
-        for alien in self.swarm:
-            self.add(alien)
+        self.swarm.update(delta_time)
+        #print(self.swarm.aliens_left) # prints number of aliens left
+
+
 
 if __name__ == "__main__":
     # song = mload("sfx/level1.ogg")
