@@ -10,9 +10,6 @@ from pyglet.image import load as iload, ImageGrid, Animation
 from pyglet.media import load as mload
 from random import random
 
-# reset rate of fire for aleins
-# reset laser rate to 400
-
 def load_animation(image):
     seq = ImageGrid(iload(image),2,1)
     return Animation.from_image_sequence(seq,0.5)
@@ -74,10 +71,8 @@ class AlienColumn:
             for i, alien_type in alien_types
         ]
 
-        print(self.rate_of_fire)
-
     def increase_rate_of_fire(self):
-        self.rate_of_fire *= 1.5
+        self.rate_of_fire *= 2
 
     def shoot(self):
         if random() < self.rate_of_fire and len(self.aliens) > 0:
@@ -132,9 +127,11 @@ class Swarm:
         self.aliens_left = 50
 
     def increase_difficulty(self):
-        self.period -= 0.3 # question for HW - Where do you call this function
+        self.period -= 0.1
+        for column in self.columns:
+            column.increase_rate_of_fire()
 
-    # return True/False whether any column is too close to edge of screen
+            # return True/False whether any column is too close to edge of screen
     def side_reached(self):
         # execute the lambda (anonymous inline function), passing it each
         # AlienColumn, then test if any of the columns report True
@@ -177,11 +174,6 @@ class Swarm:
             count += 1
         self.aliens_left = count
 
-        #print(self.period) # prints period for increase swarm movement difficulty
-
-
-
-
 class PlayerCannon(Actor):
     def __init__(self, x, y):
         super().__init__("img/cannon.png", x ,y)
@@ -215,7 +207,7 @@ class PlayerShoot(Actor):
     def __init__(self, x, y):
         super().__init__("img/laser.png", x, y)
 
-        self.speed = Vector2(0, 2000)
+        self.speed = Vector2(0, 400)
         PlayerShoot.ACTIVE_SHOOT = self
 
     def collide(self,other):
@@ -329,7 +321,6 @@ class GameLayer(Layer):
         else:
             self.score += points
 
-
         self.hud.update_score(self.score)
 
     def create_swarm(self, x, y):
@@ -363,8 +354,6 @@ class GameLayer(Layer):
             actor.update(delta_time)
 
         self.swarm.update(delta_time)
-
-        #print(self.swarm.aliens_left) # prints number of aliens left
 
 if __name__ == "__main__":
     # song = mload("sfx/level1.ogg")
