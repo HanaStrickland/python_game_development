@@ -64,7 +64,8 @@ class Alien(Actor):
 # a column creates and contains its Aliens
 class AlienColumn:
     def __init__(self, x, y):
-        self.rate_of_fire = 0.0000
+        self.rate_of_fire = 0.0001
+
         # enumerate() provides an index number for each list item
         alien_types = enumerate(["3", "3", "2", "2", "1"])
 
@@ -73,9 +74,10 @@ class AlienColumn:
             for i, alien_type in alien_types
         ]
 
-    def increase_difficulty(self):
-        self.rate_of_fire *= 2
+        print(self.rate_of_fire)
 
+    def increase_rate_of_fire(self):
+        self.rate_of_fire *= 1.5
 
     def shoot(self):
         if random() < self.rate_of_fire and len(self.aliens) > 0:
@@ -107,7 +109,6 @@ class AlienColumn:
         return x >= width - 50 and direction == 1 or \
                x <= 50 and direction == -1
 
-
 # the Swarm contains all AlienColumns
 class Swarm:
     # initialized with x and y of bottom alien in first column
@@ -117,6 +118,7 @@ class Swarm:
             AlienColumn(x + i * 60, y)
             for i in range(10)
         ]
+
         # swarm initially moves to the right (direction 1)
         self.direction = 1
         # only has horizontal speed
@@ -130,7 +132,7 @@ class Swarm:
         self.aliens_left = 50
 
     def increase_difficulty(self):
-        self.period -= 0.1 # question for HW - Where do you call this function?
+        self.period -= 0.3 # question for HW - Where do you call this function
 
     # return True/False whether any column is too close to edge of screen
     def side_reached(self):
@@ -174,6 +176,10 @@ class Swarm:
         for alien in self:
             count += 1
         self.aliens_left = count
+
+        #print(self.period) # prints period for increase swarm movement difficulty
+
+
 
 
 class PlayerCannon(Actor):
@@ -309,9 +315,22 @@ class GameLayer(Layer):
         self.hud.update_lives(self.lives)
 
     def update_score(self, points=0):
-        self.score += points
-        self.hud.update_score(self.score)
 
+        # if score before kill is less than 150 and score + points acquired is greater than 150, then increase difficulty
+        if self.score < 150 and self.score + points >= 150:
+            self.score += points
+            self.swarm.increase_difficulty()
+        elif self.score < 300 and self.score + points >= 300:
+            self.score += points
+            self.swarm.increase_difficulty()
+        elif self.score < 450 and self.score + points >= 450:
+            self.score += points
+            self.swarm.increase_difficulty()
+        else:
+            self.score += points
+
+
+        self.hud.update_score(self.score)
 
     def create_swarm(self, x, y):
         self.swarm = Swarm(x, y)
@@ -344,9 +363,8 @@ class GameLayer(Layer):
             actor.update(delta_time)
 
         self.swarm.update(delta_time)
+
         #print(self.swarm.aliens_left) # prints number of aliens left
-
-
 
 if __name__ == "__main__":
     # song = mload("sfx/level1.ogg")
